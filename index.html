@@ -180,6 +180,7 @@
             text-align: center;
             padding: 40px 20px;
             color: #999;
+            grid-column: 1/-1;
         }
         .empty-state emoji { font-size: 3em; display: block; margin-bottom: 10px; }
         @media (max-width: 600px) {
@@ -196,8 +197,8 @@
     <div class="controls">
         <div class="input-group">
             <input type="text" id="inputProduct" placeholder="Nom du produit ou lien...">
-            <button class="btn-add" id="btnAdd">➕ Ajouter</button>
-            <button class="btn-link" id="btnLink" title="Coller un lien Amazon/site">🔗 Lien</button>
+            <button class="btn-add" onclick="app.addProduct()">➕ Ajouter</button>
+            <button class="btn-link" id="btnLink" onclick="app.addFromLink()">🔗 Lien</button>
         </div>
     </div>
     <div class="categories" id="categories"></div>
@@ -214,11 +215,13 @@
                 this.renderCategories();
                 this.render();
                 document.getElementById('inputProduct').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this.addProduct();
+                    if (e.key === 'Enter') {
+                        this.addProduct();
+                    }
                 });
-                document.getElementById('btnAdd').addEventListener('click', () => this.addProduct());
-                document.getElementById('btnLink').addEventListener('click', () => this.addFromLink());
-                this.registerServiceWorker();
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('sw.js').catch(() => {});
+                }
             },
             
             loadData() {
@@ -245,7 +248,7 @@
                 this.render();
             },
             
-            async addProduct() {
+            addProduct() {
                 const input = document.getElementById('inputProduct');
                 const text = input.value.trim();
                 if (!text) return;
@@ -265,42 +268,28 @@
                 this.render();
             },
             
-            async addFromLink() {
+            addFromLink() {
                 const input = document.getElementById('inputProduct');
                 const url = input.value.trim();
                 if (!url || !url.startsWith('http')) {
-                    alert('Veuillez entrer une URL valide');
+                    alert('Veuillez entrer une URL valide (commençant par http)');
                     return;
                 }
                 
-                try {
-                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&headers=%7B%22User-Agent%22:%22Mozilla/5.0%22%7D`);
-                    const data = await response.json();
-                    const html = data.contents;
-                    
-                    const product = {
-                        id: Date.now(),
-                        name: this.extractMeta(html, 'og:title') || this.extractMeta(html, 'title') || 'Produit',
-                        price: this.extractMeta(html, 'product:price:amount') || '',
-                        image: this.extractMeta(html, 'og:image') || '📦',
-                        category: this.currentCategory,
-                        checked: false,
-                        url: url
-                    };
-                    this.products.push(product);
-                    this.saveData();
-                    input.value = '';
-                    this.render();
-                } catch (e) {
-                    alert('Erreur lors de la récupération des données du lien');
-                    console.error(e);
-                }
-            },
-            
-            extractMeta(html, property) {
-                const regex = new RegExp(`<meta\\s+(?:property="${property}"|name="${property}")\\s+content="([^"]*)"`, 'i');
-                const match = html.match(regex);
-                return match ? match[1].trim() : '';
+                const product = {
+                    id: Date.now(),
+                    name: 'Produit du lien',
+                    category: this.currentCategory,
+                    price: '',
+                    image: '📦',
+                    checked: false,
+                    url: url
+                };
+                this.products.push(product);
+                this.saveData();
+                input.value = '';
+                this.render();
+                alert('Produit ajouté! (extraction d\'image en développement)');
             },
             
             toggleProduct(id) {
@@ -321,13 +310,13 @@
                 const container = document.getElementById('listContainer');
                 
                 if (filtered.length === 0) {
-                    container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><span class="empty-state emoji">📭</span>Aucun produit dans cette catégorie</div>`;
+                    container.innerHTML = `<div class="empty-state"><span class="empty-state emoji">📭</span>Aucun produit dans cette catégorie</div>`;
                     return;
                 }
                 
                 container.innerHTML = filtered.map(p => `
-                    <div class="product-card ${p.checked ? 'checked' : ''}">
-                        <img src="${p.image}" alt="${p.name}" class="product-image" onerror="this.innerHTML='📦'">
+                    <div class="product-card ${p.checked ? 'opacity-checked' : ''}">
+                        <div class="product-image">${p.image}</div>
                         <div class="product-name">${p.name}</div>
                         ${p.price ? `<div class="product-price">${p.price}€</div>` : ''}
                         <div class="product-category">${p.category}</div>
@@ -339,16 +328,12 @@
                         </div>
                     </div>
                 `).join('');
-            },
-            
-            registerServiceWorker() {
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('sw.js').catch(() => {});
-                }
             }
         };
         
-        app.init();
+        document.addEventListener('DOMContentLoaded', function() {
+            app.init();
+        });
     </script>
 </body>
 </html>
