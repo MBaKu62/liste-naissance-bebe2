@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -103,32 +104,37 @@ if(!t)return;
 this.products.push({id:Date.now(),name:t,category:this.currentCategory,price:"",image:"",description:"",checked:false,url:""});
 this.saveData();
 inp.value="";
-this.render();
+this.render()
+isBadImage:function(u){
+if(!u)return true;
+var b=["favicon","icon","logo","apple-touch","placeholder","default","no-image","empty","blank","opengraph"];
+for(var i=0;i<b.length;i++){if(u.toLowerCase().indexOf(b[i])>=0)return true;}
+var ext=["jpg","jpeg","png","gif","webp","bmp"];
+for(var j=0;j<ext.length;j++){if(u.toLowerCase().indexOf("."+ext[j])>=0)return false;}
+return true;
 },
-isBadImage:function(url){
-if(!url)return true;
-var bad=["favicon","icon","logo","apple-touch","opengraph","og:image","placeholder","default","no-image","empty","blank"];
-for(var i=0;i<bad.length;i++){if(url.toLowerCase().indexOf(bad[i])>=0)return true;}
-if(url.indexOf("amazon")>=0&&url.indexOf("logo")>=0)return true;
-if(url.indexOf("ssl-images-amazon")>=0)return true;
-var goodExt=["jpg","jpeg","png","gif","webp","bmp"];
-var isGood=false;
-for(var j=0;j<goodExt.length;j++){if(url.toLowerCase().indexOf("."+goodExt[j])>=0){isGood=true;break;}}
-if(!isGood)return true;
-return false;
+extractOG:function(html){
+var doc=new DOMParser().parseFromString(html,"text/html");
+var data={};
+var t=doc.querySelector('meta[property="og:title"]');
+if(t&&t.content)data.title=t.content;
+var d=doc.querySelector('meta[property="og:description"]');
+if(d&&d.content)data.description=d.content;
+var i=doc.querySelector('meta[property="og:image"]');
+if(i&&i.content&&!this.isBadImage(i.content))data.image=i.content;
+var p=doc.querySelector('meta[property="product:price:amount"]');
+if(p&&p.content)data.price=p.content;
+var title=doc.querySelector("title");
+if(title&&!data.title)data.title=title.textContent;
+return data;
 },
-extractImage:function(d){
-var imgUrl=null;
-if(d.image){
-if(typeof d.image==="object"&&d.image.url){
-if(d.image.width>200&&d.image.height>200){imgUrl=d.image.url;}
-else if(!this.isBadImage(d.image.url)){imgUrl=d.image.url;}
-}
-else if(typeof d.image==="string"&&d.image.length>50){
-if(!this.isBadImage(d.image)){imgUrl=d.image.url||d.image;}
-}
-}
-return imgUrl;
+getAmazonASIN:function(u){
+var m=u.match(/\/dp\/(B[A-Z0-9]{9})/i)||u.match(/\/gp\/product\/(B[A-Z0-9]{9})/i);
+return m?m[1]:null;
+},
+getAmazonImage:function(asin){
+if(!asin)return null;
+return "https://m.media-amazon.com/images/I/"+asin+"._AC_SL500_.jpg";
 },
 addFromLink:function(){
 var inp=document.getElementById("inputProduct");
@@ -143,33 +149,71 @@ var p={id:loadingId,name:"Extraction en cours...",category:this.currentCategory,
 this.products.push(p);
 this.saveData();
 this.render();
-var apiUrl="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true";
 var self=this;
-fetch(apiUrl).then(function(r){
-if(!r.ok)throw new Error("err");
-return r.json();
-}).then(function(data){
-var extracted={id:Date.now(),name:"",category:self.currentCategory,price:"",image:"",description:"",checked:false,url:u};
+var extracted={id:Date.now(),name:"",category:this.currentCategory,price:"",image:"",description:"",checked:false,url:u};
 var ok=false;
+Promise.resolve().then(function(){
+if(u.indexOf("amazon.")>=0){
+var asin=self.getAmazonASIN(u);
+if(asin){
+extracted.image=self.getAmazonImage(asin);
+if(extracted.image)ok=true;
+}
+}
+return true;
+}).then(function(){
+var api="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true";
+return fetch(api).then(function(r){if(!r.ok)throw new Error();return r.json();}).then(function(data){
 if(data.status==="success"&&data.data){
 var d=data.data;
 if(d.title&&d.title!==""&&d.title.length>3&&d.title.length<200){extracted.name=d.title;ok=true;}
 if(d.description&&d.description!==""&&d.description.length>10){extracted.description=d.description.substring(0,200);ok=true;}
-var imgUrl=self.extractImage(d);
-if(imgUrl){extracted.image=imgUrl;ok=true;}
+if(d.image){
+var img=d.image.url||d.image;
+if(img&&!self.isBadImage(img))extracted.image=img;
+}
 if(d.price&&d.price!==""){extracted.price=d.price;ok=true;}
 }
-self.products=self.products.filter(function(z){return z.id!==loadingId});
+return true;
+}).catch(function(){return true;});
+}).then(function(){
+if(!ok||!extracted.name){
+var api2="https://www.opengraph.to/api/v1/og?url="+encodeURIComponent(u);
+return fetch(api2).then(function(r){if(!r.ok)throw new Error();return r.json();}).then(function(data){
+if(data.title&&data.title!==""&&data.title.length<200){extracted.name=data.title;ok=true;}
+if(data.description&&data.description!==""&&data.description.length>10){extracted.description=data.description.substring(0,200);ok=true;}
+if(data.image&&data.image.url&&!self.isBadImage(data.image.url)){extracted.image=data.image.url;ok=true;}
+return true;
+}).catch(function(){return true;});
+}
+return true;
+}).then(function(){
+if(!ok||!extracted.name){
+var proxy="https://api.allorigins.win/get?url="+encodeURIComponent(u);
+return fetch(proxy).then(function(r){if(!r.ok)throw new Error();return r.json();}).then(function(data){
+if(data.contents){
+var og=self.extractOG(data.contents);
+if(og.title&&og.title!==""&&og.title.length<200){extracted.name=og.title;ok=true;}
+if(og.description&&og.description!==""&&og.description.length>10){extracted.description=og.description.substring(0,200);ok=true;}
+if(og.image){extracted.image=og.image;ok=true;}
+if(og.price){extracted.price=og.price;ok=true;}
+}
+return true;
+}).catch(function(){return true;});
+}
+return true;
+}).then(function(){
 if(!ok){
 extracted.name="Produit du lien";
-extracted.description="Extraction echouee - le site bloque l'extraction automatique. Utilisez Modifier pour saisir les infos manuellement.";
+extracted.description="Extraction impossible (site protege). Cliquez sur Modifier pour saisir les infos.";
 }
+self.products=self.products.filter(function(z){return z.id!==loadingId});
 self.products.push(extracted);
 self.saveData();
 self.render();
 }).catch(function(){
 self.products=self.products.filter(function(z){return z.id!==loadingId});
-var failP={id:Date.now(),name:"Produit du lien",category:self.currentCategory,price:"",image:"",description:"Extraction echouee - le site bloque l'extraction. Utilisez le bouton Modifier.",checked:false,url:u};
+var failP={id:Date.now(),name:"Produit du lien",category:self.currentCategory,price:"",image:"",description:"Extraction echouee. Cliquez sur Modifier pour saisir les infos.",checked:false,url:u};
 self.products.push(failP);
 self.saveData();
 self.render();
@@ -216,7 +260,7 @@ render:function(){
 var c=document.getElementById("listContainer");
 var list=this.products.filter(function(z){return z.category===this.currentCategory},this);
 if(list.length===0){
-c.innerHTML="<div class='empty-state'>No produit dans cette catégorie. Ajoutez-en un !</div>";
+c.innerHTML="<div class='empty-state'>No produit dans cette categorie. Ajoutez-en un !</div>";
 return;
 }
 var h="";
@@ -236,10 +280,10 @@ h+='<div class="product-category">'+p.category+'</div>';
 if(p.url)h+='<div class="product-url"><a href="'+p.url+'" target="_blank">Voir le produit</a></div>';
 h+='<div class="product-actions">';
 var bg=p.checked?"#4CAF50":"#8B4D6D";
-var bt=p.checked?"Acheté":"Acheter";
+var bt=p.checked?"Achete":"Acheter";
 h+='<button class="btn-checkout" onclick="app.checkProduct('+p.id+')" style="background:'+bg+'">'+bt+'</button>';
 h+='<button class="btn-edit" onclick="app.editProduct('+p.id+')">Modifier</button>';
-h+='<button class="btn-cat" onclick="app.changeCat('+p.id+')">Catégorie</button>';
+h+='<button class="btn-cat" onclick="app.changeCat('+p.id+')">Categorie</button>';
 h+='<button class="btn-delete" onclick="app.deleteProduct('+p.id+')">Suppr</button>';
 h+='</div></div>';
 }
@@ -249,4 +293,5 @@ c.innerHTML=h;
 app.init();
 </script>
 </body>
-</html>
+</html>;
+},
