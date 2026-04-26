@@ -64,7 +64,6 @@ var app={
 categories:["Vetements","Puericulture","Jeux","Chambre","Hygiene","Repas"],
 currentCategory:"Vetements",
 products:[],
-fetchCache:{},
 init:function(){
 this.loadData();
 this.renderCategories();
@@ -106,6 +105,31 @@ this.saveData();
 inp.value="";
 this.render();
 },
+isBadImage:function(url){
+if(!url)return true;
+var bad=["favicon","icon","logo","apple-touch","opengraph","og:image","placeholder","default","no-image","empty","blank"];
+for(var i=0;i<bad.length;i++){if(url.toLowerCase().indexOf(bad[i])>=0)return true;}
+if(url.indexOf("amazon")>=0&&url.indexOf("logo")>=0)return true;
+if(url.indexOf("ssl-images-amazon")>=0)return true;
+var goodExt=["jpg","jpeg","png","gif","webp","bmp"];
+var isGood=false;
+for(var j=0;j<goodExt.length;j++){if(url.toLowerCase().indexOf("."+goodExt[j])>=0){isGood=true;break;}}
+if(!isGood)return true;
+return false;
+},
+extractImage:function(d){
+var imgUrl=null;
+if(d.image){
+if(typeof d.image==="object"&&d.image.url){
+if(d.image.width>200&&d.image.height>200){imgUrl=d.image.url;}
+else if(!this.isBadImage(d.image.url)){imgUrl=d.image.url;}
+}
+else if(typeof d.image==="string"&&d.image.length>50){
+if(!this.isBadImage(d.image)){imgUrl=d.image.url||d.image;}
+}
+}
+return imgUrl;
+},
 addFromLink:function(){
 var inp=document.getElementById("inputProduct");
 var u=inp.value.trim();
@@ -114,44 +138,41 @@ var btn=document.getElementById("btnLink");
 var old=btn.textContent;
 btn.textContent="Extraction...";
 btn.disabled=true;
-var listContainer=document.getElementById("listContainer");
 var loadingId=Date.now();
 var p={id:loadingId,name:"Extraction en cours...",category:this.currentCategory,price:"",image:"",description:"",checked:false,url:u};
-app.products.push(p);
-app.saveData();
-app.render();
-var microlink="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true&force=true";
-fetch(microlink).then(function(r){
+this.products.push(p);
+this.saveData();
+this.render();
+var apiUrl="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true";
+var self=this;
+fetch(apiUrl).then(function(r){
 if(!r.ok)throw new Error("err");
 return r.json();
 }).then(function(data){
-var extracted={id:Date.now(),name:"",category:app.currentCategory,price:"",image:"",description:"",checked:false,url:u};
+var extracted={id:Date.now(),name:"",category:self.currentCategory,price:"",image:"",description:"",checked:false,url:u};
+var ok=false;
 if(data.status==="success"&&data.data){
 var d=data.data;
-if(d.title&&d.title!==""&&d.title.length>3){extracted.name=d.title;}
-else{extracted.name="Produit du lien";}
-if(d.description&&d.description!==""&&d.description.length>10){extracted.description=d.description.substring(0,200);}
-var imgUrl=null;
-if(d.image&&typeof d.image==="object"&&d.image.url&&d.image.width>100){imgUrl=d.image.url;}
-else if(d.image&&typeof d.image==="string"&&d.image.length>50){imgUrl=d.image;}
-if(imgUrl){
-if(imgUrl.indexOf("amazon")>=0&&imgUrl.indexOf("logo")>=0){imgUrl=null;}
-else if(imgUrl.indexOf("favicon")>=0){imgUrl=null;}
-else if(imgUrl.indexOf("icon")>=0){imgUrl=null;}
-else if(imgUrl.indexOf("logo")>=0&&imgUrl.indexOf("product")<0){imgUrl=null;}
+if(d.title&&d.title!==""&&d.title.length>3&&d.title.length<200){extracted.name=d.title;ok=true;}
+if(d.description&&d.description!==""&&d.description.length>10){extracted.description=d.description.substring(0,200);ok=true;}
+var imgUrl=self.extractImage(d);
+if(imgUrl){extracted.image=imgUrl;ok=true;}
+if(d.price&&d.price!==""){extracted.price=d.price;ok=true;}
 }
-if(imgUrl){extracted.image=imgUrl;}
+self.products=self.products.filter(function(z){return z.id!==loadingId});
+if(!ok){
+extracted.name="Produit du lien";
+extracted.description="Extraction echouee - le site bloque l'extraction automatique. Utilisez Modifier pour saisir les infos manuellement.";
 }
-app.products=app.products.filter(function(z){return z.id!==loadingId});
-app.products.push(extracted);
-app.saveData();
-app.render();
+self.products.push(extracted);
+self.saveData();
+self.render();
 }).catch(function(){
-app.products=app.products.filter(function(z){return z.id!==loadingId});
-var failP={id:Date.now(),name:"Produit du lien",category:app.currentCategory,price:"",image:"",description:"Extraction échouée",checked:false,url:u};
-app.products.push(failP);
-app.saveData();
-app.render();
+self.products=self.products.filter(function(z){return z.id!==loadingId});
+var failP={id:Date.now(),name:"Produit du lien",category:self.currentCategory,price:"",image:"",description:"Extraction echouee - le site bloque l'extraction. Utilisez le bouton Modifier.",checked:false,url:u};
+self.products.push(failP);
+self.saveData();
+self.render();
 }).finally(function(){
 btn.textContent=old;
 btn.disabled=false;
