@@ -1,14 +1,26 @@
 {
-"name":"Liste Naissance - Bebe 2",
-"short_name":"Liste Naissance",
-"description":"Une liste partagee pour nos besoins Bebe 2",
-"start_url":"/liste-naissance-bebe2/",
-"scope":"/liste-naissance-bebe2/",
-"display":"standalone",
-"orientation":"portrait-primary",
-"background_color":"#fdf6f0",
-"theme_color":"#e8a0bf",
-"icons":[{"src":"icone.svg","sizes":"192x192","type":"image/svg+xml","purpose":"any"},{"src":"icone.svg","sizes":"512x512","type":"image/svg+xml","purpose":"any"}],
-"categories":["productivity"],
-"screenshots":[{"src":"icone.svg","sizes":"540x720","type":"image/svg+xml","form_factor":"narrow"}]
+  "name":"Liste Naissance - Bébé 2",
+  "short_name":"Liste Naissance",
+  "description":"Une liste partagée pour nos besoins Bébé 2",
+  "start_url":"/liste-naissance-bebe2/",
+  "scope":"/liste-naissance-bebe2/",
+  "display":"standalone",
+  "orientation":"portrait-primary",
+  "background_color":"#f8f4f0",
+  "theme_color":"#8B4D6D",
+  "icons":[
+    {
+      "src":"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%238B4D6D' width='192' height='192'/><text x='50%' y='50%' font-size='100' fill='white' text-anchor='middle' dominant-baseline='middle'>👶</text></svg>",
+      "sizes":"192x192",
+      "type":"image/svg+xml",
+      "purpose":"any"
+    },
+    {
+      "src":"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%238B4D6D' width='512' height='512'/><text x='50%' y='50%' font-size='280' fill='white' text-anchor='middle' dominant-baseline='middle'>👶</text></svg>",
+      "sizes":"512x512",
+      "type":"image/svg+xml",
+      "purpose":"any"
+    }
+  ],
+  "categories":["productivity"]
 }
