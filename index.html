@@ -101,16 +101,7 @@ addProduct:function(){
 var inp=document.getElementById("inputProduct");
 var t=inp.value.trim();
 if(!t)return;
-this.products.push({
-id:Date.now(),
-name:t,
-category:this.currentCategory,
-price:"",
-image:"",
-description:"",
-checked:false,
-url:""
-});
+this.products.push({id:Date.now(),name:t,category:this.currentCategory,price:"",image:"",description:"",checked:false,url:""});
 this.saveData();
 inp.value="";
 this.render();
@@ -118,44 +109,47 @@ this.render();
 addFromLink:function(){
 var inp=document.getElementById("inputProduct");
 var u=inp.value.trim();
-if(!u||!u.startsWith("http")){
-alert("Veuillez entrer une URL valide (commencant par http)");
-return;
-}
+if(!u||!u.startsWith("http")){alert("Veuillez entrer une URL valide (commencant par http)");return;}
 var btn=document.getElementById("btnLink");
 var old=btn.textContent;
-btn.textContent="...";
+btn.textContent="Extraction...";
 btn.disabled=true;
-var microlink="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true";
-var p={
-id:Date.now(),
-name:"",
-category:this.currentCategory,
-price:"",
-image:"",
-description:"",
-checked:false,
-url:u
-};
+var listContainer=document.getElementById("listContainer");
+var loadingId=Date.now();
+var p={id:loadingId,name:"Extraction en cours...",category:this.currentCategory,price:"",image:"",description:"",checked:false,url:u};
+app.products.push(p);
+app.saveData();
+app.render();
+var microlink="https://api.microlink.io/?url="+encodeURIComponent(u)+"&meta=true&force=true";
 fetch(microlink).then(function(r){
 if(!r.ok)throw new Error("err");
 return r.json();
 }).then(function(data){
+var extracted={id:Date.now(),name:"",category:app.currentCategory,price:"",image:"",description:"",checked:false,url:u};
 if(data.status==="success"&&data.data){
 var d=data.data;
-if(d.title)p.name=d.title;
-else p.name="Produit du lien";
-if(d.description)p.description=d.description.substring(0,150);
-if(d.image&&d.image.url)p.image=d.image.url;
-else if(d.logo&&d.logo.url)p.image=d.logo.url;
+if(d.title&&d.title!==""&&d.title.length>3){extracted.name=d.title;}
+else{extracted.name="Produit du lien";}
+if(d.description&&d.description!==""&&d.description.length>10){extracted.description=d.description.substring(0,200);}
+var imgUrl=null;
+if(d.image&&typeof d.image==="object"&&d.image.url&&d.image.width>100){imgUrl=d.image.url;}
+else if(d.image&&typeof d.image==="string"&&d.image.length>50){imgUrl=d.image;}
+if(imgUrl){
+if(imgUrl.indexOf("amazon")>=0&&imgUrl.indexOf("logo")>=0){imgUrl=null;}
+else if(imgUrl.indexOf("favicon")>=0){imgUrl=null;}
+else if(imgUrl.indexOf("icon")>=0){imgUrl=null;}
+else if(imgUrl.indexOf("logo")>=0&&imgUrl.indexOf("product")<0){imgUrl=null;}
 }
-app.products.push(p);
+if(imgUrl){extracted.image=imgUrl;}
+}
+app.products=app.products.filter(function(z){return z.id!==loadingId});
+app.products.push(extracted);
 app.saveData();
 app.render();
 }).catch(function(){
-p.name="Produit du lien";
-p.description="Extraction echouee";
-app.products.push(p);
+app.products=app.products.filter(function(z){return z.id!==loadingId});
+var failP={id:Date.now(),name:"Produit du lien",category:app.currentCategory,price:"",image:"",description:"Extraction échouée",checked:false,url:u};
+app.products.push(failP);
 app.saveData();
 app.render();
 }).finally(function(){
@@ -173,9 +167,9 @@ var pr=prompt("Prix:",x.price);
 if(pr!==null)x.price=pr;
 var de=prompt("Description:",x.description);
 if(de!==null)x.description=de;
-var im=prompt("Image URL:",x.image);
+var im=prompt("URL Image:",x.image);
 if(im!==null)x.image=im;
-var cat=prompt("Categorie (Vetements,Puericulture,Jeux,Chambre,Hygiene,Repas):",x.category);
+var cat=prompt("Catégorie (Vetements,Puericulture,Jeux,Chambre,Hygiene,Repas):",x.category);
 if(cat)x.category=cat;
 this.saveData();
 this.render();
@@ -183,12 +177,8 @@ this.render();
 changeCat:function(id){
 var x=this.products.find(function(z){return z.id===id});
 if(!x)return;
-var newCat=prompt("Nouvelle categorie:\nVetements, Puericulture, Jeux, Chambre, Hygiene, Repas",x.category);
-if(newCat){
-x.category=newCat;
-this.saveData();
-this.render();
-}
+var newCat=prompt("Nouvelle catégorie:\nVetements, Puericulture, Jeux, Chambre, Hygiene, Repas",x.category);
+if(newCat){x.category=newCat;this.saveData();this.render();}
 },
 deleteProduct:function(id){
 if(confirm("Supprimer ce produit?")){
@@ -205,7 +195,7 @@ render:function(){
 var c=document.getElementById("listContainer");
 var list=this.products.filter(function(z){return z.category===this.currentCategory},this);
 if(list.length===0){
-c.innerHTML="<div class='empty-state'>No produit dans cette categorie. Ajoutez-en un !</div>";
+c.innerHTML="<div class='empty-state'>No produit dans cette catégorie. Ajoutez-en un !</div>";
 return;
 }
 var h="";
@@ -213,7 +203,7 @@ for(var i=0;i<list.length;i++){
 var p=list[i];
 var cls=p.checked?"product-card checked":"product-card";
 var img="<span class='placeholder'>📦</span>";
-if(p.image){
+if(p.image&&p.image!==""){
 img="<img src='"+p.image+"' onerror='this.outerHTML=\"<span class=placeholder>📦</span>\"'>";
 }
 h+='<div class="'+cls+'">';
@@ -225,10 +215,10 @@ h+='<div class="product-category">'+p.category+'</div>';
 if(p.url)h+='<div class="product-url"><a href="'+p.url+'" target="_blank">Voir le produit</a></div>';
 h+='<div class="product-actions">';
 var bg=p.checked?"#4CAF50":"#8B4D6D";
-var bt=p.checked?"Achete":"Acheter";
+var bt=p.checked?"Acheté":"Acheter";
 h+='<button class="btn-checkout" onclick="app.checkProduct('+p.id+')" style="background:'+bg+'">'+bt+'</button>';
 h+='<button class="btn-edit" onclick="app.editProduct('+p.id+')">Modifier</button>';
-h+='<button class="btn-cat" onclick="app.changeCat('+p.id+')">Categorie</button>';
+h+='<button class="btn-cat" onclick="app.changeCat('+p.id+')">Catégorie</button>';
 h+='<button class="btn-delete" onclick="app.deleteProduct('+p.id+')">Suppr</button>';
 h+='</div></div>';
 }
