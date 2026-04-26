@@ -1,4 +1,4 @@
-const CACHE_NAME = 'liste-naissance-v1';
+const CACHE_NAME = 'liste-naissance-v2';
 const urlsToCache = [
   '/liste-naissance-bebe2/',
   '/liste-naissance-bebe2/index.html',
