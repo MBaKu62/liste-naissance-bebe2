@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Liste Naissance - Bebe 2</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#8B4D6D">
@@ -67,7 +67,8 @@ init:function(){
 this.loadData();
 this.renderCategories();
 this.render();
-document.getElementById('inputProduct').addEventListener('keypress',function(e){if(e.key==='Enter'){app.addProduct()}});
+var input=document.getElementById('inputProduct');
+input.addEventListener('keypress',function(e){if(e.key==='Enter'){app.addProduct()}});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
 },
 loadData:function(){
@@ -80,9 +81,11 @@ localStorage.setItem('listeNaissance',JSON.stringify(this.products));
 renderCategories:function(){
 var container=document.getElementById('categories');
 var html='';
-for(var i=0;i<this.categories.length;i++){
-var cat=this.categories[i];
-var cls=cat===this.currentCategory?'category-btn active':'category-btn';
+var cats=this.categories;
+var current=this.currentCategory;
+for(var i=0;i<cats.length;i++){
+var cat=cats[i];
+var cls=cat===current?'category-btn active':'category-btn';
 html+='<button class="'+cls+'" onclick="app.switchCategory(\''+cat+'\')">'+cat+'</button>';
 }
 container.innerHTML=html;
